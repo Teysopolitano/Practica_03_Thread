@@ -97,12 +97,13 @@ Private macros
 #define gAppJoinTimeout_c                       800    /* miliseconds */
 
 #define APP_LED_URI_PATH                        "/led"
-#define APP_TEMP_URI_PATH                       "/temp"
+//#define APP_TEMP_URI_PATH                       "/temp"
 #define APP_SINK_URI_PATH                       "/sink"
 
-#define APP_HUB_CFG_PATH						"/hub_config"
+#define APP_HUB_CFG_URI_PATH					"/sampling"
 #define APP_TEMPERATURE_URI_PATH                "/temperature"
-#define APP_HUMIDITY_PATH                       "/humidity"
+#define APP_HUMIDITY_URI_PATH                   "/humidity"
+#define APP_SPRINKLER_URI_PATH                  "/sprinkler_status"
 
 
 #if LARGE_NETWORK
@@ -161,6 +162,7 @@ static void App_RestoreLeaderLed(void *param);
 static void APP_CoapHubConfigCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
 static void APP_CoapGetTemperatureCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
 static void APP_CoapGetHumidityCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
+static void APP_CoapSprinklerStatusCb(coapSessionStatus_t sessionStatus, void *pData, coapSession_t *pSession, uint32_t dataLen);
 
 static void APP_SampleSensorValueCB(void *param);
 static void APP_SampleSensorValue(void *param);
@@ -183,13 +185,14 @@ static void APP_AutoStartCb(void *param);
 Public global variables declarations
 ==================================================================================================*/
 const coapUriPath_t gAPP_LED_URI_PATH  = {SizeOfString(APP_LED_URI_PATH), (uint8_t *)APP_LED_URI_PATH};
-const coapUriPath_t gAPP_TEMP_URI_PATH = {SizeOfString(APP_TEMP_URI_PATH), (uint8_t *)APP_TEMP_URI_PATH};
+//const coapUriPath_t gAPP_TEMP_URI_PATH = {SizeOfString(APP_TEMP_URI_PATH), (uint8_t *)APP_TEMP_URI_PATH};
 const coapUriPath_t gAPP_SINK_URI_PATH = {SizeOfString(APP_SINK_URI_PATH), (uint8_t *)APP_SINK_URI_PATH};
 
 /*Sensor hub configuration, temperature and humidity global variables*/
-const coapUriPath_t gAPP_HUB_CONFIG_URI_PATH = {SizeOfString(APP_HUB_CFG_PATH), (uint8_t *)APP_HUB_CFG_PATH};
+const coapUriPath_t gAPP_HUB_CONFIG_URI_PATH = {SizeOfString(APP_HUB_CFG_URI_PATH), (uint8_t *)APP_HUB_CFG_URI_PATH};
 const coapUriPath_t gAPP_TEMPERATURE_URI_PATH = {SizeOfString(APP_TEMPERATURE_URI_PATH), (uint8_t *)APP_TEMPERATURE_URI_PATH};
-const coapUriPath_t gAPP_HUMIDITY_URI_PATH = {SizeOfString(APP_HUMIDITY_PATH), (uint8_t *)APP_HUMIDITY_PATH};
+const coapUriPath_t gAPP_HUMIDITY_URI_PATH = {SizeOfString(APP_HUMIDITY_URI_PATH), (uint8_t *)APP_HUMIDITY_URI_PATH};
+const coapUriPath_t gAPP_SPRINKLER_URI_PATH = {SizeOfString(APP_SPRINKLER_URI_PATH), (uint8_t *)APP_SPRINKLER_URI_PATH};
 
 #if LARGE_NETWORK
 const coapUriPath_t gAPP_RESET_URI_PATH = {SizeOfString(APP_RESET_TO_FACTORY_URI_PATH), (uint8_t *)APP_RESET_TO_FACTORY_URI_PATH};
@@ -533,11 +536,12 @@ static void APP_InitCoapDemo
 )
 {
     coapRegCbParams_t cbParams[] =  {{APP_CoapLedCb,  (coapUriPath_t *)&gAPP_LED_URI_PATH},
-                                     {APP_CoapTempCb, (coapUriPath_t *)&gAPP_TEMP_URI_PATH},
+//                                     {APP_CoapTempCb, (coapUriPath_t *)&gAPP_TEMP_URI_PATH},
 									 /*Sensor Hub Configuration, get temperature and get humidity callback functions*/
 									 {APP_CoapHubConfigCb, (coapUriPath_t *)&gAPP_HUB_CONFIG_URI_PATH},
 									 {APP_CoapGetTemperatureCb, (coapUriPath_t *)&gAPP_TEMPERATURE_URI_PATH},
 									 {APP_CoapGetHumidityCb, (coapUriPath_t *)&gAPP_HUMIDITY_URI_PATH},
+									 {APP_CoapSprinklerStatusCb, (coapUriPath_t *)&gAPP_SPRINKLER_URI_PATH},
 
 
 #if LARGE_NETWORK
@@ -895,8 +899,8 @@ static void APP_CoapGenericCallback
     /* If no ACK was received, try again */
     if(sessionStatus == gCoapFailure_c)
     {
-        if(FLib_MemCmp(pSession->pUriPath->pUriPath, (coapUriPath_t *)&gAPP_TEMP_URI_PATH.pUriPath,
-                       pSession->pUriPath->length))
+//        if(FLib_MemCmp(pSession->pUriPath->pUriPath, (coapUriPath_t *)&gAPP_TEMP_URI_PATH.pUriPath,
+//                       pSession->pUriPath->length))
         {
             (void)NWKU_SendMsg(APP_ReportTemp, NULL, mpAppThreadMsgQueue);
         }
@@ -933,7 +937,7 @@ static void APP_ReportTemp
             pSession->pCallback = NULL;
             FLib_MemCpy(&pSession->remoteAddr, &gCoapDestAddress, sizeof(ipAddr_t));
             ackPloadSize = strlen((char *)pTempString);
-            COAP_SetUriPath(pSession, (coapUriPath_t *)&gAPP_TEMP_URI_PATH);
+//            COAP_SetUriPath(pSession, (coapUriPath_t *)&gAPP_TEMP_URI_PATH);
 
             if(!IP6_IsMulticastAddr(&gCoapDestAddress))
             {
@@ -1481,7 +1485,7 @@ uint32_t dataLen
                 (dataLen >= maxDisplayedString) ? (dataLen = (maxDisplayedString - 1)) : (dataLen);
                 cfg[dataLen]='\0';
                 FLib_MemCpy(cfg,pData,dataLen);
-                shell_printf("\nSampling period changed to %s", (char*)cfg);
+                shell_printf("\nSampling period changed to %s ms", (char*)cfg);
             }
             shell_printf("\tFrom IPv6 Address: %s\n\r", addrStr);
             shell_refresh();
@@ -1621,11 +1625,11 @@ void* App_GetTempData
     pIndex = sendTemperatureData;
  //   FLib_MemCpy(pIndex, sTemp, SizeOfString(sTemp));
 //    pIndex += SizeOfString(sTemp);
-    NWKU_PrintDec((uint8_t)(temp_sensor/100), pIndex, 2, TRUE);
+    NWKU_PrintDec((uint8_t)(temp_sensor), pIndex, 2, TRUE);
     pIndex += 2; /* keep only the first 2 digits */
     *pIndex = '.';
     pIndex++;
-    NWKU_PrintDec((uint8_t)(abs(temp_sensor)%100), pIndex, 2, TRUE);
+    NWKU_PrintDec((uint8_t)(abs(temp_sensor)), pIndex, 2, TRUE);
     return sendTemperatureData;
 }
 
@@ -1705,19 +1709,102 @@ void* App_GetHumidityData
     /* Compute output */
     pIndex = sendHumidityData;
 //    FLib_MemCpy(pIndex, sTemp, SizeOfString(sTemp));
-    NWKU_PrintDec((uint8_t)(humidity_sensor/100), pIndex, 3, TRUE);
+    NWKU_PrintDec((uint8_t)(humidity_sensor), pIndex, 3, TRUE);
     pIndex += 3; /* keep only the first 3 digits */
     *pIndex = '.';
     pIndex++;
-    NWKU_PrintDec((uint8_t)(abs(humidity_sensor)%100), pIndex, 1, TRUE);
+    NWKU_PrintDec((uint8_t)(abs(humidity_sensor)), pIndex, 1, TRUE);
     return sendHumidityData;
 }
 
 
 /*!*************************************************************************************************
+
+\fn     static void APP_CoapSprinklerStatusCb
+\brief  Callback handler for updating sprinkler status (Copy from APP_CoapTempCb)
+
+\param  [in] coapSessionStatus_t sessionStatus,
+\param  [in] void *pData,
+\param  [in] coapSession_t *pSession,
+\param  [in] uint32_t dataLen
+***************************************************************************************************/
+
+static void APP_CoapSprinklerStatusCb
+(
+coapSessionStatus_t sessionStatus,
+void *pData,
+coapSession_t *pSession,
+uint32_t dataLen
+)
+{
+    char *pSprkString = NULL;
+    uint32_t ackPloadSize = 0, maxDisplayedString = 10;
+
+    /* Send CoAP ACK */
+    if(gCoapGET_c == pSession->code)
+    {
+        /* Get sprinkler status */
+    	if (sprinkler_on)
+           pSprkString = (char*)"ON";
+    	else
+    	   pSprkString = (char*)"OFF";
+
+    	ackPloadSize = strlen(pSprkString);
+    }
+    /* Do not parse the message if it is duplicated */
+    else if((gCoapPOST_c == pSession->code) && (sessionStatus == gCoapSuccess_c))
+    {
+        if(NULL != pData)
+        {
+            char addrStr[INET6_ADDRSTRLEN];
+            uint8_t sprk[10];
+
+            ntop(AF_INET6, &pSession->remoteAddr, addrStr, INET6_ADDRSTRLEN);
+            shell_write("\r");
+
+            if(0 != dataLen)
+            {
+                /* Prevent from buffer overload */
+                (dataLen >= maxDisplayedString) ? (dataLen = (maxDisplayedString - 1)) : (dataLen);
+                sprk[dataLen]='\0';
+                FLib_MemCpy(sprk,pData,dataLen);
+                shell_printf("\nSprinkler is %s ", (char*)sprk);
+            }
+            shell_printf("\tFrom IPv6 Address: %s\n\r", addrStr);
+            shell_refresh();
+
+            /*Update Sprinkler status for simulating sensor values*/
+            if (strcmp((char*)sprk, "ON") == 0)
+            	sprinkler_on = TRUE;
+            else
+            	sprinkler_on = FALSE;
+
+        }
+    }
+
+    if(gCoapConfirmable_c == pSession->msgType)
+    {
+        if(gCoapGET_c == pSession->code)
+        {
+            COAP_Send(pSession, gCoapMsgTypeAckSuccessChanged_c, pSprkString, ackPloadSize);
+        }
+        else
+        {
+            COAP_Send(pSession, gCoapMsgTypeAckSuccessChanged_c, NULL, 0);
+        }
+    }
+
+    if(pSprkString)
+    {
+        MEM_BufferFree(pSprkString);
+    }
+}
+
+
+/*!*************************************************************************************************
 \private
-\fn
-\brief
+\fn static void APP_SampleSensorValueCB(void *param)
+\brief Sample sensor values callback function
 
 \param  [in]    param    Not used
 ***************************************************************************************************/
@@ -1729,31 +1816,17 @@ static void APP_SampleSensorValueCB(void *param)
 
 /***************************************************************************************************
 \private
-\fn     static void APP_SampleSensorValueCB(void)
-\brief  Callback function for sampling the current value of simulated sensors
+\fn     static void APP_SampleSensorValue(void *param)
+\brief  Function for sampling the current value of simulated sensors
 
 \param  [in]    param    Not used
 ***************************************************************************************************/
 static void APP_SampleSensorValue(void *param)
 {
-	// Get a new temperature
-	temp_sensor = get_simulated_sensor(temp_sensor, 1, 0, 40, sprinkler_on);
-	// Get tne new Humidity
-	humidity_sensor = get_simulated_sensor(humidity_sensor, 2, 0, 100, sprinkler_on);
-//	samples_cnt++;
-	// Try to print this every 10 seconds
-#if 0
-	if((samples_cnt%(10000/sampling_period_ms)) == 0) {
-		shell_printf("\tsensors - Tx10:%d%c, Hx10:%d%c, P:%d\n\r",  // C:%d\n\r",
-				     last_temperature_cx10,
-					 temperature_up?'+':'-',
-					 last_humidity_percentx10,
-					 humidity_up?'+':'-',
-					 sampling_period_ms);
-//					 samples_cnt);
-		shell_refresh();
-	}
-#endif
+	/* Get simulated temperature */
+	temp_sensor = get_simulated_sensor(temp_sensor, 1, 0, 40, !sprinkler_on);
+	/* Get simulated humidity */
+	humidity_sensor = get_simulated_sensor(humidity_sensor, 1, 0, 100, sprinkler_on);
 }
 
 /*!*************************************************************************************************
